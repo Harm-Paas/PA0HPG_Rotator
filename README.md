@@ -6,7 +6,7 @@ control software via a USB link.
 
 By :     Harm Paas PA0HPG
          Zuidlaren, The Netherlands
-e-mail : harm.paas@gmail.com
+e-mail : h.paas@rug.nl
 
 Copyright (C) 2021,2022  Harm Paas, PA0HPG, Zuidlaren, The Netherlands
 
