@@ -8,6 +8,7 @@
  * Author                 : Harm Paas PA0HPG
  * Initial Version V-1.00 : 2021-01-12 Harm Paas PA0HPG 
  * Last Update     V-1.38 : 2022-01-31 Harm Paas PA0HPG 
+ * Last Update     V-1.39 : 2022-07-06 Harm Paas PA0HPG 
  *
  * Copyright (C) 2021,2022  Harm Paas, PA0HPG, Zuidlaren, The Netherlands
  *
@@ -41,9 +42,9 @@
  * a variety of light-weight HF and UHF radio-amateur antennas.
  * In most cases the control of these rotators is done by means of a steering knob.
  * A motor in the control device runs at the same speed as the motor in the rotator 
- * and sets the antenna bearing readout light on the scale of  control device in the same direction.
+ * and follows the antenna bearing on the scale of the control device.
  * For several reasons the synchronisation between the antenna position on the scale
- * becomes misaligned with the real bearing position, mostly because the two motors do not
+ * becomes misaligned with the real bearing angle, mostly because the two motors do not
  * run at the same speed. 
  * This rotator controller replaces the control unit of these type of antenna rotators and 
  * offers remote computer control via the Yeasu GS232 rotor control protocol.
@@ -51,7 +52,7 @@
  * serial USB line for programs like N1MM, PstRotator, LOG4OM, etc.
  *
  * The Arduino-MEGA2560 based antenna rotator control unit replaces the original control unit
- * and offers several enhancements compared with the original control unit.
+ * and offers several enhancements compared to the original control unit.
  * The control unit not only shows the real antenna bearing on a TFT color display 
  * but can also be connected to a computer via a USB serial link for remote antenna position 
  * control and position display from the antenna on the computer.
@@ -63,12 +64,18 @@
  * For remote control the Yaesu GS232 compatible command language has been used.
  * The real antenna bearing angle is obtained by adding a position indicator to
  * the motor control unit consisting of a 10 turn potentiometer which is attached
- * to the gearbox of the unit by means of an extra gear. 
+ * to the gearbox of the unit by means of an extra gear.
+ * Do not overstress the potmeter! 
+ * Ensure that the number of revolutions from the gear where the potmeter gear has been attached
+ * to will yield in a number of revolutions less than 10. This will keep the potmeter
+ * safe from overturning with the consequence os a broken potmeter. In my case a 70
+ * teeth gear with module 0.5 gave about 8 turns on the 10 turn potmeter.
+ * Two adjustable constant values in the program mark the begin and end position of the potmeter.   
  * In case the control cable is broken a warning will be displayed on the control unit.
  * If the antenna becomes misaligned on the mast it is possible to correct this
  * by changing the deviation with respect to the true North. The value will be stored
  * in EEPROM with the new setting. In The Netherlands it is favourable to set the 
- * mechanical endstop of the rotor unit in direction West. Therefore the deviation position
+ * mechanical endstop of the rotor unit ponting to direction West. Therefore the deviation position
  * of 270 degrees is the default value.
  * For manual control three pushbuttons for Clockwise, CounterClockwise
  * and Stop are used. A short Push will turn the antenna one degree in the 
@@ -135,7 +142,7 @@
  *
  */
 
-#define VERSION "V1.38"
+#define VERSION "V1.39"
 
 #define MYCALL       "PA0HPG"   // You can place your own Call here
 #define MYLOCATOR    "JO33ic"   // You can place your own locator in here
@@ -526,7 +533,7 @@ void Rotator_init(){
 /* 
  * SetCourse :  
  * Determine CW or CCW motor direction with regard to the the Deviation value.
- * In the rotator software the Deviation parameter is a value  between the position of 
+ * In the rotator software the Deviation parameter is a value between the position of 
  * the Endstop of the Antenna with respect to the True North.
  * The mechanical endstop of the rotator cannot be passed.
  * In The Netherlands it is useful to set the endstop of the rotor Due West : 270 degrees
@@ -565,13 +572,7 @@ void Rotator_init(){
    if ( PotmeterPosition < PotmeterHeading) dir = CW ;
    else dir = CCW ;
    interrupts();                    // End critical section
-
-   //Serial.print(" Change_Course: PotmeterPosition "); Serial.print( PotmeterPosition ); // TEST ONLY
-   //Serial.print(" PotmeterHeading "); Serial.print( PotmeterHeading );
-   //if (Dir == CW )Serial.println(" CW");  
-   //else Serial.println(" CCW");  
-
-  return (dir);
+   return (dir);
 }
 
 /*
@@ -583,7 +584,7 @@ void Rotator_init(){
  * NewPos         : The new desired position of the Antenna in degrees
  * Deviation      : The Deviation of the Antenna with respect to the true North.
  *                  The rotor system is capable of dynamically changing
- *                  the deviation should the antenna become misaligned, this avoids 
+ *                  the deviation. Should the antenna become misaligned, this avoids 
  *                  an adjustment of the antenna and its rotor on the mast. The default 
  *                  endstop position is 270 degrees(West). 
  *                  Note that passing this point will destroy the position indicator 
@@ -605,17 +606,15 @@ void Rotate_To(int NewPos) {
   tft.setTextColor(LIGHTBLUE,NAMEBG);    
   tft.setTextPadding(tft.textWidth("360", 2)) ; // Calculate text padding width
   
-  sprintf(formattedDataBuffer, FormatData("%3d"), Heading);    // Display the current
+  sprintf(formattedDataBuffer, FormatData("%3d"), Heading);        // Display the current
   tft.drawString(formattedDataBuffer, 84,223, 2);
   sprintf(formattedDataBuffer, FormatData("%3d"), AntennaBearing); // and the former position
   tft.drawString(formattedDataBuffer, 84,203, 2);                  
 
-  Draw_Heading_Marker(Heading, TFT_RED);              // Set marker bar and go to the new position
-  //OldHeading = Heading;
-  //OldHeading = AntennaBearing;
+  Draw_Heading_Marker(Heading, TFT_RED); // Set marker bar and go to the new position
   
-  tft.drawNumber(Deviation,84,240, 2); // Deviation in Red. If Rotor aligned at WEST, value is 270 degrees
-  tft.setTextPadding(0) ;              // Set padding off again
+  tft.drawNumber(Deviation,84,240, 2);   // Deviation in Red. If Rotor aligned at WEST, value is 270 degrees
+  tft.setTextPadding(0) ;                // Set padding off again
 }
 
 // Update_Compass : Update 7 Segment display and Antennabearing marker
@@ -638,12 +637,10 @@ void rotate_stop() {
     Stop_Motor();
     Display_Dir("STOP ");
     Display_NESW(); 
-    //OldAntennaBearing = AntennaBearing;   
     PotmeterHeading  = PotmeterPosition;
     InPosition  = true;
     NewPosition = false ;
     StopOnce    = false ;
-    //    DrawInitialScreen(); // Get rid of all debris on compass
     Update_Compass(); 
   }
 }
@@ -1203,7 +1200,7 @@ void InitializeDisplay() {
   tft.fillCircle(320, 160, 130, DARKBLUE);    
   tft.fillCircle(320, 160, 120, DBCOLOR);   // Fill Compass ring
 
-  fdx = (dm *0.9 * cos(0)*PI/180) + XC;                // Calculate initial former bearing endpoint tip
+  fdx = (dm *0.9 * cos(0)*PI/180) + XC;          // Calculate initial former bearing endpoint tip
   fdy = (dm *0.9 * sin(0)*PI/180) + YC;    
   fbposdxbegin = (dm *0.7 * cos(0)*PI/180) + XC; // and end  
   fbposdybegin = (dm *0.7 * sin(0)*PI/180) + YC;    
@@ -1265,7 +1262,6 @@ void Create_Marker_Table(){
 /*
  * Draw the new antenna Heading input marker set by the buttons CW|CCW or External GS232 input command
  * Position is a red marker bar which travels around the globe. If in position, color becomes yellow.
- * On order avoiding a map rewrite the line between the center of the compass has been omitted.
  * posdx, posdy : former dx,dy position of heading marker
  * posdxbegin, posdybegin : begin of marker 
  */
@@ -1386,7 +1382,7 @@ void Display_NESW() {
 }
 
 
-// Setup. This function is called at startup once.
+// Setup. This function is called at startup and only once.
 void setup(){
   
   Serial.begin(9600);
